@@ -21,40 +21,40 @@ LocalMail is a local network-based email system that enables real-time communica
 
 ### User Management
 
-Email-based registration
-User authentication
-Active user tracking
+* Email-based registration
+* User authentication
+* Active user tracking
 
 
 ### Messaging Features
 
-Real-time message sending and receiving
-Message history viewing
-Delivery status notifications
-Timestamp tracking
+* Real-time message sending and receiving
+* Message history viewing
+* Delivery status notifications
+* Timestamp tracking
 
 
-### Interface
+## Interface
 
-Clean, modern UI design
-Responsive layout
-Easy-to-use message composition
-Message history display
+* Clean, modern UI design
+* Responsive layout
+* Easy-to-use message composition
+* Message history display
 
 
 ### Network Features
 
-Local network communication
-Cross-device compatibility
-Real-time connection status
-Automatic reconnection handling
+* Local network communication
+* Cross-device compatibility
+* Real-time connection status
+* Automatic reconnection handling
 
 
 
 ## Perfect for:
 
-Small office communications
-Local team collaboration
-Internal messaging systems
-Network-restricted environments
-Development team communication
+* Small office communications
+* Local team collaboration
+* Internal messaging systems
+* Network-restricted environments
+* Development team communication
