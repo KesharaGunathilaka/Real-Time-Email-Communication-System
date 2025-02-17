@@ -7,10 +7,15 @@ const http = require('http');
 const app = express();
 const PORT = 3000;
 const WS_PORT = 6677;
-const SERVER_IP = '192.168.1.2'; // Replace with your server laptop's IP
+const SERVER_IP = '192.168.1.2'; // Your server laptop's IP
 
-// MongoDB connection
-mongoose.connect('mongodb://localhost:27017/email-app');
+// MongoDB connection with error handling
+mongoose.connect('mongodb://127.0.0.1:27017/email-app', {
+  useNewUrlParser: true,
+  useUnifiedTopology: true
+})
+.then(() => console.log('Connected to MongoDB'))
+.catch(err => console.error('MongoDB connection error:', err));
 
 // MongoDB Schemas
 const userSchema = new mongoose.Schema({
@@ -35,32 +40,34 @@ app.use(express.json());
 // Create HTTP server
 const server = http.createServer(app);
 
-// WebSocket server
-const wss = new WebSocketServer({ port: WS_PORT });
+// WebSocket server with specific IP binding
+const wss = new WebSocketServer({ 
+  port: WS_PORT,
+  host: SERVER_IP
+});
 
 // Store connected clients
 const clients = new Map();
 
 // WebSocket connection handler
 wss.on('connection', (ws) => {
+  console.log('New WebSocket connection');
   let userEmail = null;
 
   ws.on('message', async (data) => {
     const message = data.toString();
+    console.log('Received message:', message);
     
     if (!userEmail) {
-      // First message is the email registration
       userEmail = message;
       clients.set(userEmail, ws);
       console.log(`Client registered with email: ${userEmail}`);
       ws.send(JSON.stringify({ type: 'connection', message: `Welcome, ${userEmail}!` }));
     } else {
       try {
-        // Parse the message for recipient and content
         const [recipientEmail, emailContent] = message.split('|');
         
         if (recipientEmail && emailContent) {
-          // Save email to MongoDB
           const email = new Email({
             from: userEmail,
             to: recipientEmail,
@@ -68,7 +75,6 @@ wss.on('connection', (ws) => {
           });
           await email.save();
 
-          // Send to recipient if online
           const recipientWs = clients.get(recipientEmail);
           if (recipientWs) {
             recipientWs.send(JSON.stringify({
@@ -81,13 +87,13 @@ wss.on('connection', (ws) => {
             }));
           }
 
-          // Confirm to sender
           ws.send(JSON.stringify({
             type: 'sent',
             message: `Email sent to ${recipientEmail}`
           }));
         }
       } catch (error) {
+        console.error('Error sending message:', error);
         ws.send(JSON.stringify({
           type: 'error',
           message: error.message
@@ -105,30 +111,50 @@ wss.on('connection', (ws) => {
 });
 
 // Express Routes
-app.post('/api/register', async (req, res) => {
-    try {
-      const { email } = req.body;
-  
-      // Check if the email already exists
-      const existingUser = await User.findOne({ email });
-      if (existingUser) {
-        return res.status(400).json({ error: 'Email already exists. Please sign in.' });
-      }
-  
-      // If email does not exist, create a new user
-      const user = new User({ email });
-      await user.save();
-      res.status(201).json({ message: 'User registered successfully', email });
-    } catch (error) {
-      // Handle duplicate key error (E11000)
-      if (error.code === 11000) {
-        return res.status(400).json({ error: 'Email already exists. Please sign in.' });
-      }
-      // Handle other errors
-      res.status(400).json({ error: error.message });
+// New endpoint to check if user exists
+app.post('/api/check-user', async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
     }
-  });
+    const user = await User.findOne({ email });
+    res.json({ exists: !!user });
+  } catch (error) {
+    console.error('Error checking user:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
 
+// Registration endpoint
+app.post('/api/register', async (req, res) => {
+  try {
+    console.log('Registration request received:', req.body);
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ error: 'Email already exists. Please sign in.' });
+    }
+
+    const user = new User({ email });
+    await user.save();
+    console.log('User registered:', email);
+    res.status(201).json({ message: 'User registered successfully', email });
+  } catch (error) {
+    console.error('Registration error:', error);
+    if (error.code === 11000) {
+      return res.status(400).json({ error: 'Email already exists. Please sign in.' });
+    }
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get emails endpoint
 app.get('/api/emails/:email', async (req, res) => {
   try {
     const emails = await Email.find({
@@ -136,11 +162,12 @@ app.get('/api/emails/:email', async (req, res) => {
     }).sort({ timestamp: -1 });
     res.json(emails);
   } catch (error) {
+    console.error('Error fetching emails:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
-// Delete email route
+// Delete email endpoint
 app.delete('/api/emails/:id', async (req, res) => {
   try {
     const emailId = req.params.id;
@@ -150,13 +177,21 @@ app.delete('/api/emails/:id', async (req, res) => {
     }
     res.status(200).json({ message: 'Email deleted successfully' });
   } catch (error) {
+    console.error('Error deleting email:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
-// Start server
-server.listen(PORT, () => {
-  console.log(`HTTP Server running on port ${PORT}`);
-  console.log(`WebSocket Server running on port ${WS_PORT}`);
+// Start servers
+app.listen(PORT, SERVER_IP, () => {
+  console.log(`HTTP Server running at http://${SERVER_IP}:${PORT}`);
 });
 
+wss.on('listening', () => {
+  console.log(`WebSocket Server running at ws://${SERVER_IP}:${WS_PORT}`);
+});
+
+// Error handling for WebSocket server
+wss.on('error', (error) => {
+  console.error('WebSocket server error:', error);
+});
