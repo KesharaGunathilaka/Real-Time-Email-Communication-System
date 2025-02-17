@@ -3,19 +3,19 @@ LocalMail is a local network-based email system that enables real-time communica
 
 ## Core Features:
 
-User registration with email addresses
-Real-time message delivery using WebSocket
-Persistent message storage using MongoDB
-Web-based user interface built with React
-Cross-device compatibility within local network
+* User registration with email addresses
+* Real-time message delivery using WebSocket
+* Persistent message storage using MongoDB
+* Web-based user interface built with React
+* Cross-device compatibility within local network
 
 ## Technical Stack:
 
-Frontend: React + Vite with Tailwind CSS
-Backend: Node.js with Express
-Database: MongoDB for message storage
-Real-time Communication: WebSocket protocol
-Network: LAN-based communication
+* Frontend: React + Vite with Tailwind CSS
+* Backend: Node.js with Express
+* Database: MongoDB for message storage
+* Real-time Communication: WebSocket protocol
+* Network: LAN-based communication
 
 ## Key Capabilities:
 
