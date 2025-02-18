@@ -7,7 +7,7 @@ const http = require('http');
 const app = express();
 const PORT = 3000;
 const WS_PORT = 6677;
-const SERVER_IP = '192.168.1.2'; // Your server laptop's IP
+const SERVER_IP = '192.168.0.163'; // Your server laptop's IP
 
 // MongoDB connection with error handling
 mongoose.connect('mongodb://127.0.0.1:27017/email-app', {
