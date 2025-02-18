@@ -66,7 +66,7 @@ function EmailDashboard({ userEmail, signOut }) {
 
         wsRef.current.onerror = (error) => {
             console.error('WebSocket error:', error);
-            setError('Connection error occurred');
+            // setError('Connection error occurred');
         };
 
         wsRef.current.onclose = () => {
