@@ -3,11 +3,21 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const { WebSocketServer } = require('ws');
 const http = require('http');
+const multer = require('multer');
+const path = require('path');
+const { Worker } = require('worker_threads');
+const fs = require('fs');
+const upath = require('path');
+
+const uploadsDir = upath.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+}
 
 const app = express();
 const PORT = 3000;
 const WS_PORT = 6677;
-const SERVER_IP = '192.168.0.163'; // Your server laptop's IP
+const SERVER_IP = '192.168.1.5'; // Your server laptop's IP
 
 // MongoDB connection with error handling
 mongoose.connect('mongodb://127.0.0.1:27017/email-app', {
@@ -27,15 +37,29 @@ const emailSchema = new mongoose.Schema({
   from: { type: String, required: true },
   to: { type: String, required: true },
   message: { type: String, required: true },
+  attachment: { type: String },
   timestamp: { type: Date, default: Date.now }
 });
 
 const User = mongoose.model('User', userSchema);
 const Email = mongoose.model('Email', emailSchema);
 
+// Multer setup for file uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, 'uploads/');
+  },
+  filename: (req, file, cb) => {
+    cb(null, `${Date.now()}-${file.originalname}`);
+  }
+});
+
+const upload = multer({ storage });
+
 // Express middleware
 app.use(cors());
 app.use(express.json());
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Create HTTP server
 const server = http.createServer(app);
@@ -65,13 +89,14 @@ wss.on('connection', (ws) => {
       ws.send(JSON.stringify({ type: 'connection', message: `Welcome, ${userEmail}!` }));
     } else {
       try {
-        const [recipientEmail, emailContent] = message.split('|');
+        const [recipientEmail, emailContent, attachment] = message.split('|');
         
         if (recipientEmail && emailContent) {
           const email = new Email({
             from: userEmail,
             to: recipientEmail,
-            message: emailContent
+            message: emailContent,
+            attachment: attachment || null
           });
           await email.save();
 
@@ -82,6 +107,7 @@ wss.on('connection', (ws) => {
               email: {
                 from: userEmail,
                 message: emailContent,
+                attachment: attachment || null,
                 timestamp: new Date()
               }
             }));
@@ -178,6 +204,19 @@ app.delete('/api/emails/:id', async (req, res) => {
     res.status(200).json({ message: 'Email deleted successfully' });
   } catch (error) {
     console.error('Error deleting email:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Upload attachment endpoint
+app.post('/api/upload', upload.single('file'), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+    res.json({ filePath: `/uploads/${req.file.filename}` });
+  } catch (error) {
+    console.error('Error uploading file:', error);
     res.status(500).json({ error: error.message });
   }
 });

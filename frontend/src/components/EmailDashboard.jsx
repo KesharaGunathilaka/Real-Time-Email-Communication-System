@@ -4,6 +4,7 @@ import { API_BASE_URL, WS_URL } from '../config';
 function EmailDashboard({ userEmail, signOut }) {
     const [recipient, setRecipient] = useState('');
     const [message, setMessage] = useState('');
+    const [attachment, setAttachment] = useState(null);
     const [emails, setEmails] = useState([]);
     const [error, setError] = useState('');
     const [status, setStatus] = useState('');
@@ -87,9 +88,22 @@ function EmailDashboard({ userEmail, signOut }) {
         }
 
         try {
-            wsRef.current.send(`${recipient}|${message}`);
+            let attachmentPath = '';
+            if (attachment) {
+                const formData = new FormData();
+                formData.append('file', attachment);
+                const uploadResponse = await fetch(`${API_BASE_URL}/api/upload`, {
+                    method: 'POST',
+                    body: formData,
+                });
+                const uploadData = await uploadResponse.json();
+                attachmentPath = uploadData.filePath;
+            }
+
+            wsRef.current.send(`${recipient}|${message}|${attachmentPath}`);
             setRecipient('');
             setMessage('');
+            setAttachment(null);
         } catch (error) {
             setError('Failed to send email');
         }
@@ -134,6 +148,14 @@ function EmailDashboard({ userEmail, signOut }) {
                             required
                         />
                     </div>
+                    <div>
+                        <label className="block text-gray-700 mb-2">Attachment:</label>
+                        <input
+                            type="file"
+                            onChange={(e) => setAttachment(e.target.files[0])}
+                            className="w-full p-2 border rounded"
+                        />
+                    </div>
                     <button
                         type="submit"
                         className="bg-blue-500 text-white p-2 rounded hover:bg-blue-600"
@@ -155,6 +177,13 @@ function EmailDashboard({ userEmail, signOut }) {
                                 {new Date(email.timestamp).toLocaleString()}
                             </div>
                             <div className="mt-2">{email.message}</div>
+                            {email.attachment && (
+                                <div className="mt-2">
+                                    <a href={`${API_BASE_URL}${email.attachment}`} download>
+                                        Download Attachment
+                                    </a>
+                                </div>
+                            )}
                             <button
                                 onClick={() => handleDeleteEmail(email._id)}
                                 className="mt-2 bg-red-500 text-white p-1 rounded hover:bg-red-600"
