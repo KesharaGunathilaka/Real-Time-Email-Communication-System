@@ -1,4 +1,4 @@
-export const SERVER_IP = '192.168.1.5'; // Replace with server laptop's IP
+export const SERVER_IP = '192.168.0.163'; // Replace with server laptop's IP
 export const HTTP_PORT = 3000;
 export const WS_PORT = 6677;
 

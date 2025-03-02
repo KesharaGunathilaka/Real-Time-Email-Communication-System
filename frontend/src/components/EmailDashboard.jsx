@@ -251,10 +251,6 @@ function EmailDashboard({ userEmail, signOut }) {
                                     <Trash2 size={18} />
                                 </button>
                             </div>
-
-
-                          //  <div className="mt-2 text-gray-700">{email.message}</div>
-
                         </div>
                     ))}
 
