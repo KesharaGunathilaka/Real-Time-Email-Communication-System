@@ -14,10 +14,7 @@ function EmailDashboard({ userEmail, signOut }) {
     const wsRef = useRef(null);
 
     useEffect(() => {
-        // Fetch existing emails
         fetchEmails();
-
-        // Setup WebSocket connection
         connectWebSocket();
 
         return () => {
@@ -27,6 +24,7 @@ function EmailDashboard({ userEmail, signOut }) {
         };
     }, [userEmail]);
 
+    // ... (keeping all the same functions: fetchEmails, connectWebSocket, handleSendEmail, handleDeleteEmail)
     const fetchEmails = async () => {
         try {
             const response = await fetch(`${API_BASE_URL}/api/emails/${userEmail}`);
@@ -42,8 +40,7 @@ function EmailDashboard({ userEmail, signOut }) {
         wsRef.current = new WebSocket(WS_URL);
 
         wsRef.current.onopen = () => {
-            console.log('WebSocket Connected');
-            // Register email address
+            console.log('WebSocket connection opened');
             wsRef.current.send(userEmail);
         };
 
@@ -60,9 +57,10 @@ function EmailDashboard({ userEmail, signOut }) {
                     setShowNotification(true);// Show notification for 3 seconds
                     setTimeout(() => setShowNotification(false), 3000);// Hide notification after 3 seconds
                     fetchEmails(); // Refresh email list
+
                     break;
                 case 'newEmail':
-                    fetchEmails(); // Refresh when new email received
+                    fetchEmails();
                     break;
                 case 'error':
                     setError(data.message);
@@ -72,12 +70,10 @@ function EmailDashboard({ userEmail, signOut }) {
 
         wsRef.current.onerror = (error) => {
             console.error('WebSocket error:', error);
-            // setError('Connection error occurred');
         };
 
         wsRef.current.onclose = () => {
             console.log('WebSocket connection closed');
-            // Attempt to reconnect after a delay
             setTimeout(connectWebSocket, 3000);
         };
     };
@@ -120,7 +116,7 @@ function EmailDashboard({ userEmail, signOut }) {
                 method: 'DELETE',
             });
             if (!response.ok) throw new Error('Failed to delete email');
-            fetchEmails(); // Refresh the email list after deletion
+            fetchEmails();
             setStatus('Email deleted successfully');
         } catch (error) {
             setError(error.message);
@@ -147,6 +143,7 @@ function EmailDashboard({ userEmail, signOut }) {
                     Email sent successfully!
                 </div>
             )}
+
             {/* New Email Form */}
             <div className="bg-white rounded-lg shadow-md mb-8 p-6">
                 <h2 className="text-2xl font-bold mb-4">New Email</h2>
@@ -220,7 +217,6 @@ function EmailDashboard({ userEmail, signOut }) {
                     </button>
                 </div>
 
-
                 {/* Email List */}
                 <div className="space-y-4">
                     {filteredEmails.map((email) => (
@@ -233,6 +229,7 @@ function EmailDashboard({ userEmail, signOut }) {
                                     <div className="text-gray-600 text-sm">
                                         {new Date(email.timestamp).toLocaleString()}
                                     </div>
+
                                     <div className="mt-2">{email.message}</div>
                                     {email.attachment && (
                                         <div className="mt-2">
@@ -245,6 +242,7 @@ function EmailDashboard({ userEmail, signOut }) {
                                             </a>
                                         </div>
                                     )}
+
                                 </div>
                                 <button
                                     onClick={() => handleDeleteEmail(email._id)}
@@ -254,6 +252,9 @@ function EmailDashboard({ userEmail, signOut }) {
                                 </button>
                             </div>
 
+
+                          //  <div className="mt-2 text-gray-700">{email.message}</div>
+
                         </div>
                     ))}
 
@@ -261,6 +262,7 @@ function EmailDashboard({ userEmail, signOut }) {
             </div>
 
             {/* Sign Out Button */}
+
             <div className="mt-8">
                 <button
                     onClick={signOut}
