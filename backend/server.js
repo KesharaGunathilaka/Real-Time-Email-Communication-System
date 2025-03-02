@@ -3,19 +3,26 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const { WebSocketServer } = require('ws');
 const http = require('http');
+const multer = require('multer');
+const path = require('path');
+const { Worker } = require('worker_threads');
+const fs = require('fs');
+const upath = require('path');
+
+const uploadsDir = upath.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+}
 
 const app = express();
 const PORT = 3000;
 const WS_PORT = 6677;
-const SERVER_IP = '192.168.0.163'; // Your server laptop's IP
+const SERVER_IP = '192.168.1.5'; // Your server laptop's IP
 
 // MongoDB connection with error handling
-mongoose.connect('mongodb://127.0.0.1:27017/email-app', {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-})
-.then(() => console.log('Connected to MongoDB'))
-.catch(err => console.error('MongoDB connection error:', err));
+mongoose.connect('mongodb://127.0.0.1:27017/email-app')
+  .then(() => console.log('Connected to MongoDB'))
+  .catch(err => console.error('MongoDB connection error:', err));
 
 // MongoDB Schemas
 const userSchema = new mongoose.Schema({
@@ -27,15 +34,29 @@ const emailSchema = new mongoose.Schema({
   from: { type: String, required: true },
   to: { type: String, required: true },
   message: { type: String, required: true },
+  attachment: { type: String },
   timestamp: { type: Date, default: Date.now }
 });
 
 const User = mongoose.model('User', userSchema);
 const Email = mongoose.model('Email', emailSchema);
 
+// Multer setup for file uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, 'uploads/');
+  },
+  filename: (req, file, cb) => {
+    cb(null, `${Date.now()}-${file.originalname}`);
+  }
+});
+
+const upload = multer({ storage });
+
 // Express middleware
 app.use(cors());
 app.use(express.json());
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Create HTTP server
 const server = http.createServer(app);
@@ -65,32 +86,40 @@ wss.on('connection', (ws) => {
       ws.send(JSON.stringify({ type: 'connection', message: `Welcome, ${userEmail}!` }));
     } else {
       try {
-        const [recipientEmail, emailContent] = message.split('|');
+        const [recipientEmail, emailContent, attachment] = message.split('|');
         
         if (recipientEmail && emailContent) {
-          const email = new Email({
-            from: userEmail,
-            to: recipientEmail,
-            message: emailContent
+          const emailWorker = new Worker('./workers/emailWorker.js', {
+            workerData: {
+              from: userEmail,
+              to: recipientEmail,
+              message: emailContent,
+              attachment: attachment || null
+            }
           });
-          await email.save();
 
-          const recipientWs = clients.get(recipientEmail);
-          if (recipientWs) {
-            recipientWs.send(JSON.stringify({
-              type: 'newEmail',
-              email: {
-                from: userEmail,
-                message: emailContent,
-                timestamp: new Date()
-              }
+          emailWorker.on('message', (savedEmail) => {
+            const recipientWs = clients.get(recipientEmail);
+            if (recipientWs) {
+              recipientWs.send(JSON.stringify({
+                type: 'newEmail',
+                email: savedEmail
+              }));
+            }
+
+            ws.send(JSON.stringify({
+              type: 'sent',
+              message: `Email sent to ${recipientEmail}`
             }));
-          }
+          });
 
-          ws.send(JSON.stringify({
-            type: 'sent',
-            message: `Email sent to ${recipientEmail}`
-          }));
+          emailWorker.on('error', (error) => {
+            console.error('Error in email worker:', error);
+            ws.send(JSON.stringify({
+              type: 'error',
+              message: error.message
+            }));
+          });
         }
       } catch (error) {
         console.error('Error sending message:', error);
@@ -111,7 +140,6 @@ wss.on('connection', (ws) => {
 });
 
 // Express Routes
-// New endpoint to check if user exists
 app.post('/api/check-user', async (req, res) => {
   try {
     const { email } = req.body;
@@ -126,7 +154,6 @@ app.post('/api/check-user', async (req, res) => {
   }
 });
 
-// Registration endpoint
 app.post('/api/register', async (req, res) => {
   try {
     console.log('Registration request received:', req.body);
@@ -154,7 +181,6 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
-// Get emails endpoint
 app.get('/api/emails/:email', async (req, res) => {
   try {
     const emails = await Email.find({
@@ -167,7 +193,6 @@ app.get('/api/emails/:email', async (req, res) => {
   }
 });
 
-// Delete email endpoint
 app.delete('/api/emails/:id', async (req, res) => {
   try {
     const emailId = req.params.id;
@@ -182,6 +207,30 @@ app.delete('/api/emails/:id', async (req, res) => {
   }
 });
 
+app.post('/api/upload', upload.single('file'), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    const fileWorker = new Worker('./workers/fileWorker.js', {
+      workerData: { filePath: req.file.path }
+    });
+
+    fileWorker.on('message', (processedFilePath) => {
+      res.json({ filePath: `/uploads/${path.basename(processedFilePath)}` });
+    });
+
+    fileWorker.on('error', (error) => {
+      console.error('Error in file worker:', error);
+      res.status(500).json({ error: error.message });
+    });
+  } catch (error) {
+    console.error('Error uploading file:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Start servers
 app.listen(PORT, SERVER_IP, () => {
   console.log(`HTTP Server running at http://${SERVER_IP}:${PORT}`);
@@ -191,7 +240,6 @@ wss.on('listening', () => {
   console.log(`WebSocket Server running at ws://${SERVER_IP}:${WS_PORT}`);
 });
 
-// Error handling for WebSocket server
 wss.on('error', (error) => {
   console.error('WebSocket server error:', error);
 });

@@ -5,6 +5,7 @@ import { API_BASE_URL, WS_URL } from '../config';
 function EmailDashboard({ userEmail, signOut }) {
     const [recipient, setRecipient] = useState('');
     const [message, setMessage] = useState('');
+    const [attachment, setAttachment] = useState(null);
     const [emails, setEmails] = useState([]);
     const [error, setError] = useState('');
     const [status, setStatus] = useState('');
@@ -55,7 +56,8 @@ function EmailDashboard({ userEmail, signOut }) {
                     setStatus(data.message);
                     setShowNotification(true);// Show notification for 3 seconds
                     setTimeout(() => setShowNotification(false), 3000);// Hide notification after 3 seconds
-                    fetchEmails();
+                    fetchEmails(); // Refresh email list
+
                     break;
                 case 'newEmail':
                     fetchEmails();
@@ -87,9 +89,22 @@ function EmailDashboard({ userEmail, signOut }) {
         }
 
         try {
-            wsRef.current.send(`${recipient}|${message}`);
+            let attachmentPath = '';
+            if (attachment) {
+                const formData = new FormData();
+                formData.append('file', attachment);
+                const uploadResponse = await fetch(`${API_BASE_URL}/api/upload`, {
+                    method: 'POST',
+                    body: formData,
+                });
+                const uploadData = await uploadResponse.json();
+                attachmentPath = uploadData.filePath;
+            }
+
+            wsRef.current.send(`${recipient}|${message}|${attachmentPath}`);
             setRecipient('');
             setMessage('');
+            setAttachment(null);
         } catch (error) {
             setError('Failed to send email');
         }
@@ -134,7 +149,7 @@ function EmailDashboard({ userEmail, signOut }) {
                 <h2 className="text-2xl font-bold mb-4">New Email</h2>
                 {error && <div className="mb-4 bg-red-100 border border-red-500 text-red-700 px-4 py-3 rounded">{error}</div>}
                 {status && <div className="mb-4 bg-green-100 border border-green-500 text-green-700 px-4 py-3 rounded">{status}</div>}
-                
+
                 <form onSubmit={handleSendEmail} className="space-y-4">
                     <div>
                         <label className="block text-gray-700 mb-2">To:</label>
@@ -155,6 +170,14 @@ function EmailDashboard({ userEmail, signOut }) {
                             required
                         />
                     </div>
+                    <div>
+                        <label className="block text-gray-700 mb-2">Attachment:</label>
+                        <input
+                            type="file"
+                            onChange={(e) => setAttachment(e.target.files[0])}
+                            className="w-full p-2 border rounded"
+                        />
+                    </div>
                     <button
                         type="submit"
                         className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 flex items-center gap-2"
@@ -168,7 +191,7 @@ function EmailDashboard({ userEmail, signOut }) {
             {/* Email History */}
             <div className="bg-white rounded-lg shadow-md p-6">
                 <h2 className="text-2xl font-bold mb-4">Email History</h2>
-                
+
                 {/* Filter Tabs */}
                 <div className="flex space-x-4 mb-4 border-b">
                     <button
@@ -206,6 +229,20 @@ function EmailDashboard({ userEmail, signOut }) {
                                     <div className="text-gray-600 text-sm">
                                         {new Date(email.timestamp).toLocaleString()}
                                     </div>
+
+                                    <div className="mt-2">{email.message}</div>
+                                    {email.attachment && (
+                                        <div className="mt-2">
+                                            <a href={`${API_BASE_URL}${email.attachment}`} download>
+                                                <button
+                                                    className="text-white bg-blue-600 w-48 h-10 rounded-md font-semibold hover:bg-blue-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 cursor-pointer"
+                                                >
+                                                    Download Attachment
+                                                </button>
+                                            </a>
+                                        </div>
+                                    )}
+
                                 </div>
                                 <button
                                     onClick={() => handleDeleteEmail(email._id)}
@@ -214,19 +251,26 @@ function EmailDashboard({ userEmail, signOut }) {
                                     <Trash2 size={18} />
                                 </button>
                             </div>
-                            <div className="mt-2 text-gray-700">{email.message}</div>
+
+
+                          //  <div className="mt-2 text-gray-700">{email.message}</div>
+
                         </div>
                     ))}
+
                 </div>
             </div>
 
             {/* Sign Out Button */}
-            <button
-                onClick={signOut}
-                className="mt-8 bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
-            >
-                Sign Out
-            </button>
+
+            <div className="mt-8">
+                <button
+                    onClick={signOut}
+                    className="mt-8 bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
+                >
+                    Sign Out
+                </button>
+            </div>
         </div>
     );
 }
