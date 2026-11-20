@@ -1,0 +1,14 @@
+# dependencies
+node_modules/
+
+# user uploads created at run time
+backend/uploads/
+
+# environment and local files
+.env
+.env.*
+*.log
+.DS_Store
+
+# build output
+dist/

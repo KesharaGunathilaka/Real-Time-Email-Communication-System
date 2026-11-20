@@ -1,60 +1,89 @@
-# LocalMail: Real-Time Local Network Communication System
-LocalMail is a local network-based email system that enables real-time communication between users on the same network, perfect for internal team communication or local network messaging.
+# LocalMail: Real-Time Messaging over a Local Network
 
-## Core Features:
+LocalMail is an email-style messaging system that runs entirely on a local network, with no internet connection and no external mail server. Users on the same LAN sign in with an email address, send each other messages and file attachments, and see new messages arrive in real time. Messages are kept in MongoDB so the history can be read later.
 
-* User registration with email addresses
-* Real-time message delivery using WebSocket
-* Persistent message storage using MongoDB
-* Web-based user interface built with React
-* Cross-device compatibility within local network
+It was a group project for the Operating Systems and Networking module (Semester 6), built by Keshara Gunathilaka and Kanishka Gunasinghe.
 
-## Technical Stack:
+<p align="center">
+  <img src="docs/dashboard.png" alt="LocalMail email history with Incoming, Outgoing and All filters and an attachment" width="420">
+</p>
 
-* Frontend: React + Vite with Tailwind CSS
-* Backend: Node.js with Express
-* Database: MongoDB for message storage
-* Real-time Communication: WebSocket protocol
-* Network: LAN-based communication
+*Screenshot from a local run with demo accounts.*
 
-## Key Capabilities:
+## Architecture
 
-### User Management
+![LocalMail architecture](docs/architecture.png)
 
-* Email-based registration
-* User authentication
-* Active user tracking
+| Part | What it does | Where |
+|---|---|---|
+| React client | Sign-in page and the mail dashboard (compose, history, filters) | `frontend/src` |
+| Express REST API (port 3000) | Check user, register, list and delete messages, upload files | `backend/server.js` |
+| WebSocket server (port 6677) | Registers each client's email, receives sends, pushes `newEmail` to the recipient and `sent` to the sender | `backend/server.js` |
+| Email worker thread | Saves each message to MongoDB off the main event loop | `backend/workers/emailWorker.js` |
+| File worker thread | Handles each uploaded file (copies it to `processed_<name>`) | `backend/workers/fileWorker.js` |
+| MongoDB | Stores users and messages | `backend/models/emailSchema.js` |
 
+### How a message travels
 
-### Messaging Features
+1. The client opens a WebSocket and sends its email address; the server keeps a map of email to socket.
+2. If there is an attachment, the client uploads it over HTTP first and gets back a file path.
+3. The client sends `recipient|message|attachmentPath` over the WebSocket.
+4. The server starts an email worker thread, which saves the message to MongoDB.
+5. The server pushes a `newEmail` event to the recipient (if online) and a `sent` confirmation to the sender.
+6. Both clients refresh their history from the REST API. A client that loses its connection retries every 3 seconds.
 
-* Real-time message sending and receiving
-* Message history viewing
-* Delivery status notifications
-* Timestamp tracking
+## Features
 
+- Email-based sign-in and registration
+- Real-time delivery over WebSocket
+- Persistent message history in MongoDB
+- File attachments (Multer uploads, served from `/uploads`)
+- Incoming, Outgoing and All filters
+- Delete messages
+- Automatic WebSocket reconnection
+- Works across devices on the same local network
 
-## Interface
+## Tech stack
 
-* Clean, modern UI design
-* Responsive layout
-* Easy-to-use message composition
-* Message history display
+- **Frontend:** React 19, Vite 6, React Router, Tailwind CSS 4, Lucide icons
+- **Backend:** Node.js, Express, `ws`, Mongoose, Multer, `worker_threads`
+- **Database:** MongoDB
+- **Network:** LAN, HTTP and WebSocket
 
+## REST API
 
-### Network Features
+| Method | Path | Purpose |
+|---|---|---|
+| POST | `/api/check-user` | Does this email exist? |
+| POST | `/api/register` | Create a user |
+| GET | `/api/emails/:email` | Messages sent or received by an email, newest first |
+| DELETE | `/api/emails/:id` | Delete a message |
+| POST | `/api/upload` | Upload an attachment (`multipart/form-data`, field `file`) |
 
-* Local network communication
-* Cross-device compatibility
-* Real-time connection status
-* Automatic reconnection handling
+## Run it
 
+You need Node.js 18 or newer and a MongoDB server running on `127.0.0.1:27017`.
 
+1. **Set the server address.** Replace `192.168.199.200` with the LAN IP of the machine that runs the backend, in both places:
+   - `backend/server.js` (`SERVER_IP`)
+   - `frontend/src/config.js` (`SERVER_IP`)
 
-## Perfect for:
+   For a single-machine test you can use `127.0.0.1` in both.
 
-* Small office communications
-* Local team collaboration
-* Internal messaging systems
-* Network-restricted environments
-* Development team communication
+2. **Start the backend** (it must be started from the `backend` folder):
+
+   ```bash
+   cd backend
+   npm install
+   node server.js
+   ```
+
+3. **Start the frontend**, exposing it on the network so other devices can open it:
+
+   ```bash
+   cd frontend
+   npm install
+   npm run dev -- --host
+   ```
+
+4. Open the address Vite prints (for example `http://<server-ip>:5173`) on any device on the same network, register an email, and open a second browser or device with another email to send messages.
