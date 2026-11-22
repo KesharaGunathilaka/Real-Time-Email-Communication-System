@@ -2,8 +2,6 @@
 
 LocalMail is an email-style messaging system that runs entirely on a local network, with no internet connection and no external mail server. Users on the same LAN sign in with an email address, send each other messages and file attachments, and see new messages arrive in real time. Messages are kept in MongoDB so the history can be read later.
 
-It was a group project for the Operating Systems and Networking module (Semester 6), built by Keshara Gunathilaka and Kanishka Gunasinghe.
-
 <p align="center">
   <img src="docs/dashboard.png" alt="LocalMail email history with Incoming, Outgoing and All filters and an attachment" width="420">
 </p>
@@ -87,3 +85,14 @@ You need Node.js 18 or newer and a MongoDB server running on `127.0.0.1:27017`.
    ```
 
 4. Open the address Vite prints (for example `http://<server-ip>:5173`) on any device on the same network, register an email, and open a second browser or device with another email to send messages.
+
+## Team
+
+Built jointly for the Operating Systems and Networking module by:
+
+- **Keshara Gunathilaka**
+- **Kanishka Gunasinghe**
+
+## License
+
+Released under the [MIT License](LICENSE).

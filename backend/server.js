@@ -99,6 +99,12 @@ wss.on('connection', (ws) => {
           });
 
           emailWorker.on('message', (savedEmail) => {
+            // The worker reports a failed save as { error }, so do not push it as an email
+            if (savedEmail.error) {
+              ws.send(JSON.stringify({ type: 'error', message: savedEmail.error }));
+              return;
+            }
+
             const recipientWs = clients.get(recipientEmail);
             if (recipientWs) {
               recipientWs.send(JSON.stringify({

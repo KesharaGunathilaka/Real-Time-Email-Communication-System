@@ -31,7 +31,8 @@ const email = new Email({
 email.save()
   .then(savedEmail => {
     // Send the saved email back to the main thread
-    parentPort.postMessage(savedEmail);
+    // A Mongoose document cannot be cloned by postMessage, so send a plain object
+    parentPort.postMessage(JSON.parse(JSON.stringify(savedEmail)));
   })
   .catch(error => {
     // Log the error and send it back to the main thread
